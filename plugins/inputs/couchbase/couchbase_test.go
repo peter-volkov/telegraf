@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/influxdata/telegraf/filter"
 	"github.com/influxdata/telegraf/testutil"
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +15,7 @@ import (
 
 func TestGatherServer(t *testing.T) {
 	var pool couchbase.Pool
+	var err error
 	if err := json.Unmarshal([]byte(poolsDefaultResponse), &pool); err != nil {
 		t.Fatal("parse poolsDefaultResponse", err)
 	}
@@ -22,8 +24,10 @@ func TestGatherServer(t *testing.T) {
 		t.Fatal("parse bucketResponse", err)
 	}
 	var cb Couchbase
+	cb.includeExclude, err = filter.NewIncludeExcludeFilter([]string{}, []string{})
+	require.NoError(t, err)
 	var acc testutil.Accumulator
-	err := cb.gatherServer("mycluster", &acc, &pool)
+	err = cb.gatherServer("mycluster", &acc, &pool)
 	require.NoError(t, err)
 	acc.AssertContainsTaggedFields(t, "couchbase_node",
 		map[string]interface{}{"memory_free": 23181365248.0, "memory_total": 64424656896.0},
@@ -78,7 +82,10 @@ func TestGatherDetailedBucketMetrics(t *testing.T) {
 		}
 	}))
 
+	var err error
 	var cb Couchbase
+	cb.includeExclude, err = filter.NewIncludeExcludeFilter([]string{}, []string{})
+	require.NoError(t, err)
 	var acc testutil.Accumulator
 	bucketStats := &BucketStats{}
 	if err := json.Unmarshal([]byte(bucketStatsResponse), bucketStats); err != nil {
@@ -86,7 +93,7 @@ func TestGatherDetailedBucketMetrics(t *testing.T) {
 	}
 
 	fields := make(map[string]interface{})
-	err := cb.gatherDetailedBucketStats(fakeServer.URL, bucket, fields)
+	err = cb.gatherDetailedBucketStats(fakeServer.URL, bucket, fields)
 	require.NoError(t, err)
 
 	acc.AddFields("couchbase_bucket", fields, nil)
